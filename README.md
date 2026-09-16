@@ -84,7 +84,7 @@ enum-mssql.sh -u sa -p 'SuperSecret' -r 10.129.46.200 -l tun0 --dump
 
 ---
 
-## 🛡️ Execution Phases
+## Execution Phases
 
 1. **Basic Server Recon:** Versioning, Hostname, Current User mapping.
 2. **Privileges & Roles:** Server-level permissions and Impersonation rights.
