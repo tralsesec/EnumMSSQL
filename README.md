@@ -2,11 +2,9 @@
 
 <img width="1516" height="360" alt="image" src="https://github.com/user-attachments/assets/5255a21d-a014-4aaa-83a0-4cb15d875a9c" />
 
-**EnumMSSQL** is a weaponized, military-grade, standalone bash wrapper for `impacket-mssqlclient`. It is designed to automate the MSSQL post-exploitation lifecycle, transforming standard enumeration into a highly visual, zero-dependency workflow.
+**EnumMSSQL** is an automated, standalone post-exploitation engine built around `impacket-mssqlclient`. Designed for internal network audits and CTF infrastructure, it accelerates the MSSQL privilege escalation lifecycle without adding external runtime dependencies.
 
-It handles terminal layout healing, background listener management (Responder), port auditing, and LinPEAS-style colorized output for rapid identification of privilege escalation vectors.
-
-This was originally developed as a private tool for my personal engagements and CTF workflows. I've decided to open-source it to streamline MSSQL post-exploitation for the community.
+Key capabilities include dynamic terminal layout healing, automated background listener management (Responder integration), remote port auditing, and LinPEAS-inspired colorized triage for instant identification of high-value misconfigurations, linked servers, and privilege escalation paths.
 
 ---
 
