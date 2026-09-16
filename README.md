@@ -10,8 +10,8 @@ Key capabilities include dynamic terminal layout healing, automated background l
 
 ## 🎯 Features
 
-* **The Ghost Hunter:** Dynamically maps Linked Servers and utilizes `TRY...CATCH` blocks and RPC calls to test remote execution capabilities and identify "ghost" DNS entries ripe for spoofing.
-* **Triple-Threat Hash Capturing:** Automatically spins up a background `Responder` instance, safely isolates its database to prevent "hash skipping", and attempts forced NTLM authentication over both **SMB (445)** and **WebDAV (80)** to bypass strict egress firewalls.
+* **Linked Server & RPC Audit:** Dynamically maps Linked Servers and utilizes `TRY...CATCH` blocks and RPC calls to test remote execution capabilities and identify "ghost" DNS entries ripe for spoofing.
+* **Automated NTLM Relaying / Coercion Fallback:** Automatically spins up a background `Responder` instance, safely isolates its database to prevent "hash skipping", and attempts forced NTLM authentication over both **SMB (445)** and **WebDAV (80)** to bypass strict egress firewalls.
 * **Auto-Dump (`--dump`):** Bypasses T-SQL cursor limitations utilizing undocumented stored procedures (`sp_MSforeachdb` / `sp_MSforeachtable`) to seamlessly extract every table from every non-system database into a local flat file.
 * **Visual Threat Parsing:** Aggressively filters Impacket's raw TDS rowset output and color-codes the results. High-value PrivEsc vectors (e.g., `is_trustworthy_on`, `xp_cmdshell`, `sysadmin`) are highlighted in **RED**, while system defaults are muted in **YELLOW**.
 * **Pre-Flight Port Auditing:** Actively scans your local host for conflicting sockets (Port 80/443/445) before launching listeners, allowing you to selectively kill blocking processes on the fly.
@@ -74,7 +74,7 @@ enum-mssql.sh -u sa -p 'SuperSecret' -r 10.129.46.200 -l tun0 --dump
 
 ---
 
-### 🦖 See it in Action
+### See it in Action
 
 <img width="3840" height="2097" alt="image" src="https://github.com/user-attachments/assets/76875007-1eb9-4979-9010-c2c8b9ecced0" />
 
@@ -101,9 +101,9 @@ enum-mssql.sh -u sa -p 'SuperSecret' -r 10.129.46.200 -l tun0 --dump
 
 ---
 
-## 🧠 Deep-Dive
+## Deep-Dive
 
-### 📦 Mass Extraction via Undocumented Procedures (Dump Mode)
+### Mass Extraction via Undocumented Procedures (Dump Mode)
 
 Standard T-SQL data extraction across an entire database instance typically requires writing nested, clunky cursors, managing dynamic SQL strings, and keeping track of state - a process that easily breaks or triggers defensive alerts due to heavy execution footprints.
 
@@ -130,7 +130,7 @@ By embedding `USE [?];` inside the internal command execution block of `sp_MSfor
 
 ---
 
-### 👻 Linked Server Auditing & "Ghost" Hunting (Phase 7)
+### Linked Server Auditing & "Ghost" Hunting (Phase 7)
 
 Linked Servers allow an MSSQL instance to execute T-SQL statements against separate, remote database servers. If misconfigured, they create massive lateral movement vectors, especially if `rpc` and `rpc out` features are toggled on.
 
@@ -161,7 +161,7 @@ This forces the local SQL instance to pass the payload over the wire, running it
 
 ---
 
-### 🌐 Multi-Vector NTLM Capture & WebDAV Evasion (Phase 9)
+### Multi-Vector NTLM Capture & WebDAV Evasion (Phase 9)
 
 Forcing an MSSQL server to authenticate against an arbitrary external entity is a classic post-exploitation technique, but relying on a single method often fails due to local configuration hardening or aggressive network egress filtering.
 
@@ -197,7 +197,7 @@ When Windows parses a UNC path containing `@80`, the underlying `WebClnt` (WebDA
 
 ---
 
-### ❓Language-Agnostic RID Cycling (Phase 10)
+### Language-Agnostic RID Cycling (Phase 10)
 
 Standard SQL enumeration scripts often fail in real-world Active Directory environments because they rely on hardcoded names like `REDELEGATE\Administrator` to grab the Domain SID. If the administrative account has been renamed or the system utilizes a localized language pack (e.g., German `Domänen-Benutzer`), the query immediately fails.
 
